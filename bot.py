@@ -1,13 +1,13 @@
 import aiohttp
 import asyncio
 import async_timeout
-
+import requests
 import arrow
 import logging
 import yaml
 
 # logging.basicConfig(level=logging.DEBUG)
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig()
 
 log = logging.getLogger(__name__)
 
@@ -25,11 +25,12 @@ _standard_headers = {
     'Authorization': 'Bearer {0}'.format(SPARK_API_KEY)
 }
 
-async def list_rooms(session):
-    with async_timeout.timeout(10):
-        log.debug("Fetching rooms")
-        async with session.get(ROOMS_URL, headers=_standard_headers) as response:
-            return await response.json()
+
+def list_rooms(session):
+    log.debug("Fetching rooms")
+    response = requests.get(ROOMS_URL, headers=_standard_headers)
+    return response.json()
+
 
 async def fetch_messages(session, room):
     log.debug("Fetching messages for room {0}".format(room))
@@ -39,32 +40,38 @@ async def fetch_messages(session, room):
                                headers=_standard_headers) as response:
             return await response.json()
 
+heard = []
 async def main(start):
     tasks = []
     async with aiohttp.ClientSession() as session:
-        rooms = await list_rooms(session)
+        rooms = list_rooms(session)
         room_data = [(room['id'], room['title'], room['lastActivity']) for room in rooms['items']]
         for room, name, lastActivity in room_data:
-            task = asyncio.ensure_future(fetch_messages(session, room))
-            tasks.append(task)
+            if arrow.get(lastActivity) > start:
+                log.debug("Checking room messages..")
+                task = asyncio.ensure_future(fetch_messages(session, room))
+                tasks.append(task)
+            else:
+                log.debug("No new activity on this room")
 
         responses = await asyncio.gather(*tasks)
-        for messages in tasks:
-            if arrow.get(lastActivity) > start:
-                for message in messages['items']:
-                    try:
-                        text = message['text']
-                    except KeyError:
-                        # File message
-                        text = '<file>'
-                    date = arrow.get(message['created'])
-                    if date > start:
-                        print("{0} said {1}: {2}".format(message['personEmail'],
-                                                     date.humanize(),
-                                                     text))
+        for messages in responses:
+            for message in messages['items']:
+                try:
+                    text = message['text']
+                except KeyError:
+                    # File message
+                    text = '<file>'
+                date = arrow.get(message['created'])
+                if date > start and message['id'] not in heard:
+                    heard.append(message['id'])
+                    print("{0} said {1}: {2}".format(message['personEmail'],
+                                                 date.humanize(),
+                                                 text))
 start = arrow.utcnow()
 loop = asyncio.get_event_loop()
 print("Listing rooms and messages..")
-future = main(start)
-loop.run_until_complete(future)
+while True:
+    future = main(start)
+    loop.run_until_complete(future)
 loop.close()
