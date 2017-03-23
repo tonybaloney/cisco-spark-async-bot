@@ -19,16 +19,32 @@ with open('config.yml') as conf_yml:
     config = yaml.load(conf_yml)
 
 SPARK_API_KEY = config['api_key']
-rooms = config['rooms']
+try:
+    WHITELIST_ROOMS = config['rooms']
+except KeyError:
+    WHITELIST_ROOMS = False
 
 _standard_headers = {
     'Authorization': 'Bearer {0}'.format(SPARK_API_KEY)
 }
 
 
+def handle_message(text, email):
+    # This is where you would call your bot with the message..
+    pass
+
+
 def list_rooms(session):
     log.debug("Fetching rooms")
     response = requests.get(ROOMS_URL, headers=_standard_headers)
+    response.raise_for_status()
+    return response.json()
+
+
+def get_room(session, room_id):
+    log.debug("Get room")
+    response = requests.get(ROOMS_URL + '/' + room_id, headers=_standard_headers)
+    response.raise_for_status()
     return response.json()
 
 
@@ -47,8 +63,12 @@ async def main(start):
     tasks = []
 
     async with aiohttp.ClientSession() as session:
-        rooms = list_rooms(session)
-        room_data = [(room['id'], room['title'], room['lastActivity']) for room in rooms['items']]
+        if WHITELIST_ROOMS:
+            rooms = [get_room(session, room_id) for room_id in WHITELIST_ROOMS]
+        else:
+            rooms = list_rooms(session)['items']
+
+        room_data = [(room['id'], room['title'], room['lastActivity']) for room in rooms]
         
         # For each room, only ask if it has activity since the start of the application
         for room, name, lastActivity in room_data:
@@ -74,7 +94,7 @@ async def main(start):
                     print("{0} said {1}: {2}".format(message['personEmail'],
                                                  date.humanize(),
                                                  text))
-                    # This is where you would call your bot with the message..
+                    handle_message(text, message['personEmail'])
 
 start = arrow.utcnow()
 loop = asyncio.get_event_loop()

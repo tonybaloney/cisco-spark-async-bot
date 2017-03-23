@@ -19,6 +19,14 @@ Set a file `config.yml` with the settings
 api_key: <api key>
 ```
 
+Optionally, you can set the list of rooms by ID
+
+```yaml
+rooms:
+    - <rooom 1 id>
+    - <room 2 id>
+```
+
 ## Run
 
 Using Python 3 (3.5+)
