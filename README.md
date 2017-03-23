@@ -2,6 +2,11 @@
 
 A simple Python 3 demo using AIOHTTP for asynchronous polling of Cisco Spark for messages.
 
+The thread will get the time, get a list of rooms, then asynchronously get all new messages in every room
+and print them on the screen.
+
+You could use this for a simple message callback/bot function.
+
 ## Install
 
 `pip install -r requirements.txt`
@@ -12,7 +17,6 @@ Set a file `config.yml` with the settings
 
 ```yaml
 api_key: <api key>
-default_room_id: <default room id>
 ```
 
 ## Run
