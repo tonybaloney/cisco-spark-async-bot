@@ -40,12 +40,17 @@ async def fetch_messages(session, room):
                                headers=_standard_headers) as response:
             return await response.json()
 
+# Messages we have heard
 heard = []
+
 async def main(start):
     tasks = []
+
     async with aiohttp.ClientSession() as session:
         rooms = list_rooms(session)
         room_data = [(room['id'], room['title'], room['lastActivity']) for room in rooms['items']]
+        
+        # For each room, only ask if it has activity since the start of the application
         for room, name, lastActivity in room_data:
             if arrow.get(lastActivity) > start:
                 log.debug("Checking room messages..")
@@ -54,6 +59,7 @@ async def main(start):
             else:
                 log.debug("No new activity on this room")
 
+        # Wait for all rooms to respond
         responses = await asyncio.gather(*tasks)
         for messages in responses:
             for message in messages['items']:
@@ -68,8 +74,11 @@ async def main(start):
                     print("{0} said {1}: {2}".format(message['personEmail'],
                                                  date.humanize(),
                                                  text))
+                    # This is where you would call your bot with the message..
+
 start = arrow.utcnow()
 loop = asyncio.get_event_loop()
+print("Cisco Spark Async bot")
 print("Listing rooms and messages..")
 while True:
     future = main(start)
